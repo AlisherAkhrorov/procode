@@ -1,21 +1,23 @@
 require("dotenv").config();
 const express = require("express");
-const cors = require('cors');
+const cors = require("cors");
 const bodyParser = require("body-parser");
-const routerRouter = require("./router.js");
+const routerRouter = require("./routers/router.js");
+
 const PORT = process.env.PORT || 4000;
 const app = express();
-app.use(cors())
+app.use(cors());
 app.use(bodyParser.json());
-
 app.use("/", routerRouter);
 
-
-const start = async (req, res) => {
+const startServer = async () => {
   try {
-    app.listen(PORT, () => console.log(`Listening on ${PORT}`));
+    app.listen(PORT, () => {
+      console.log(`Server listening on port ${PORT}`);
+    });
   } catch (error) {
-    console.log(error);
+    console.error(error);
   }
 };
-start();
+
+startServer();
