@@ -1,89 +1,88 @@
-const hdb = require("../config/hdb");
-const oracledb = require('oracledb');
+const { getProcodeData } = require("../services/procode.service");
 
-async function getProcode(req, res, next) {
-  let connection;
+/**
+ * Валидация входных параметров
+ */
+function validateParams(params) {
+  const { card_num, startDate, endDate } = params;
+  const errors = [];
 
-  const { card_num, startDate, endDate } = req.body;
+  if (!card_num) {
+    errors.push("Номер карты обязателен");
+  }
+
+  if (!startDate) {
+    errors.push("Начальная дата обязательна");
+  } else if (!/^\d{2}-\d{2}-\d{4}$/.test(startDate)) {
+    errors.push("Начальная дата должна быть в формате DD-MM-YYYY");
+  }
+
+  if (!endDate) {
+    errors.push("Конечная дата обязательна");
+  } else if (!/^\d{2}-\d{2}-\d{4}$/.test(endDate)) {
+    errors.push("Конечная дата должна быть в формате DD-MM-YYYY");
+  }
+
+  return {
+    isValid: errors.length === 0,
+    errors,
+  };
+}
+
+/**
+ * Обработчик запроса на получение процессингового кода
+ * Адаптирован для работы с Fastify
+ */
+async function getProcode(request, reply) {
+  const startTime = Date.now();
+
   try {
-    connection = await hdb.getConnection();
-    const query = `
-      SELECT 
-        PRIMECARDSERNO as CardSerno,
-        ROWNUM as RowNumber,
-        I002_NUMBER as CardNumber,
-        I038_AUTH_ID as AuthID,
-        serno as AuthSerno,
-        LTIMESTAMP as AuthDateTime,
-        I004_AMT_TRXN as AuthAmount,
-        OTB_AMT_CARD, 
-        AMT_CARD as CardAmount, 
-        I049_CUR_TRXN as AuthCurrency,
-        CARDCURRENCY as CardCurrency,
-        I019_ACQ_COUNTRY as AuthCountry,
-        I032_ACQUIRER_ID as AcquirerID,
-        I043A_MERCH_NAME as MerchantName,
-        I018_MERCH_TYPE as MerchantType,
-        I042_MERCH_ID as MerchantID,
-        I043B_MERCH_CITY as MerchantCity, 
-        I022_POS_ENTRY as POSEntry,
-        SOURCE as AuthSource,
-        I039_RSP_CD as ResponseCode,
-        I037_RET_REF_NUM as RetrievalReferenceNumber,
-        REASONCODE as ReasonCode
-      FROM 
-        authorizations 
-      WHERE 
-        I002_NUMBER=:card_num
-      AND 
-        LTIMESTAMP 
-      BETWEEN 
-        TO_DATE(:startDate, 'DD-MM-YYYY') 
-      AND 
-        TO_DATE(:endDate, 'DD-MM-YYYY')
-      ORDER BY 
-        LTIMESTAMP
-      ASC
-    `;
-
-    const binds = {
-      card_num: {
-        type: oracledb.DB_TYPE_CHAR,
-        dir: oracledb.BIND_IN,
-        val: card_num,
-      },
-      startDate,
-      endDate,
-    };
-    const result = await connection.execute(query, binds, {});
-    const columnNames = result.metaData.map(({ name }) => name);
-    const rows = result.rows.map((row) => {
-      const objectRow = Object.fromEntries(
-        columnNames.map((name, index) => [
-          name,
-          typeof row[index] === "string" ? row[index].trim() : row[index],
-        ])
-      );
-
-      objectRow["ResponseDescription"] =
-        objectRow["REASONCODE"] === 0 ? "Approved" : "Declined";
-      return objectRow;
-    }
+    // Получение параметров с поддержкой пагинации
+    const { card_num, startDate, endDate } = request.body;
+    const page = parseInt(request.query.page || request.body.page || 1, 10);
+    const limit = parseInt(
+      request.query.limit || request.body.limit || 100,
+      10
     );
 
-    res.json({ rows });
-  } catch (err) {
-    console.error("Error executing query:", err);
-    next(err);
-  } finally {
-    if (connection) {
-      try {
-        await connection.close();
-      } catch (err) {
-        console.error("Error closing connection:", err);
-        next(err);
-      }
+    // Валидация параметров
+    // Fastify автоматически валидирует согласно схеме, но мы оставляем доп. проверки
+    const validation = validateParams({ card_num, startDate, endDate });
+    if (!validation.isValid) {
+      return reply.code(400).send({
+        success: false,
+        errors: validation.errors,
+      });
     }
+
+    // Получение данных из сервиса
+    const data = await getProcodeData({
+      card_num,
+      startDate,
+      endDate,
+      page,
+      limit,
+    });
+
+    const executionTime = Date.now() - startTime;
+    request.log.info(
+      `Запрос выполнен за ${executionTime}мс, получено ${data.rows.length} строк`
+    );
+
+    // Отправка успешного ответа с Fastify
+    return {
+      success: true,
+      data,
+      executionTime,
+    };
+  } catch (err) {
+    request.log.error("Ошибка выполнения запроса:", err);
+    // Передача ошибки обработчику ошибок Fastify
+    throw {
+      statusCode: 500,
+      message: "Ошибка при получении данных",
+      originalError: err.message,
+    };
   }
 }
 
