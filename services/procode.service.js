@@ -1,7 +1,7 @@
 const hdb = require("../config/hdb");
 const oracledb = require("oracledb");
 const { getProcodeQuery } = require("../queries/procode.queries");
-const { getResponseDescription } = require("../constants/responseCodes");
+const { getOperationTypeByProcCode } = require("../constants/operationTypes");
 
 /**
  * Проверка на транзиентные ошибки, которые можно повторить
@@ -60,11 +60,10 @@ function formatRows(rows, columnNames) {
       ])
     );
 
-    // Используем справочник для получения описания по коду ответа
-    objectRow["ResponseDescription"] = getResponseDescription(
-      objectRow["RESPONSECODE"]
+    objectRow["TYPEOPERATION"] = getOperationTypeByProcCode(
+      objectRow["MESSAGETYPE"],
+      objectRow["PROCCODE"]
     );
-
     return objectRow;
   });
 }
@@ -99,7 +98,6 @@ async function getProcodeData({ card_num, startDate, endDate, page, limit }) {
 
     const columnNames = result.metaData.map(({ name }) => name);
     const formattedRows = formatRows(result.rows, columnNames);
-
     // Получаем общее количество записей
     const totalRows =
       formattedRows.length > 0 ? formattedRows[0].TOTAL_ROWS : 0;
