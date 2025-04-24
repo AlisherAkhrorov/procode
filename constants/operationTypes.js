@@ -19,7 +19,7 @@ const OPERATION_TYPES = {
     100000: "DR",
     170000: "DR",
     110000: "DR",
-    200000: "RC",
+    200000: "CR",
     280000: "CR",
     203000: "CR",
     260000: "CR",
@@ -47,6 +47,6 @@ function getOperationTypeByProcCode(msgType, procCode) {
     return "PIN CHANGE";
   }
   return OPERATION_TYPES[msgType][procCode];
-};
+}
 
 module.exports = { OPERATION_TYPES, getOperationTypeByProcCode };
