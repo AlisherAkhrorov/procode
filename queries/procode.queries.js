@@ -55,9 +55,9 @@ const getProcodeQuery = `
     BETWEEN 
       TO_DATE(:startDate, 'DD-MM-YYYY') 
     AND 
-      TO_DATE(:endDate, 'DD-MM-YYYY')
+      TO_DATE(:endDate || ' 23:59:59', 'DD-MM-YYYY HH24:MI:SS')
     ORDER BY 
-      a.LTIMESTAMP ASC
+      a.LTIMESTAMP DESC
   ) WHERE ROWNUM > :offset AND ROWNUM <= :end_offset
 `;
 
