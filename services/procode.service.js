@@ -60,6 +60,14 @@ function formatRows(rows, columnNames) {
       ])
     );
 
+    if (
+      objectRow["MESSAGETYPE"] === "0130" &&
+      objectRow["REASONCODE"] === 122
+    ) {
+      objectRow["TYPEOPERATION"] = "ERROR";
+      return objectRow;
+    }
+
     objectRow["TYPEOPERATION"] = getOperationTypeByProcCode(
       objectRow["MESSAGETYPE"],
       objectRow["PROCCODE"]
